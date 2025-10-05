@@ -33,11 +33,11 @@ class Filter:
         self.config = AutoConfig.from_pretrained(
             model_name_or_path, num_labels=num_labels
         )
-        self.config.max_length = self.tokenizer.max_model_input_sizes[
-            "bert-base-cased"
-            if "bert-base-cased" in self.tokenizer.max_model_input_sizes
-            else "distilbert-base-uncased"
-        ]
+        # self.config.max_length = self.tokenizer.max_model_input_sizes[
+        #     "bert-base-cased"
+        #     if "bert-base-cased" in self.tokenizer.max_model_input_sizes
+        #     else "distilbert-base-uncased"
+        # ]
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name_or_path, config=self.config
         ).to(self.device)
@@ -47,6 +47,7 @@ class Filter:
         class_weights = [
             total_samples / class_counts[i] for i in range(len(class_counts))
         ]
+        # print(class_weights, train_labels)
         weights = [class_weights[train_labels[i]] for i in range(total_samples)]
         self.train_sampler = torch.utils.data.WeightedRandomSampler(
             torch.DoubleTensor(weights), total_samples
@@ -80,6 +81,7 @@ class Filter:
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             evaluation_strategy="epoch",
+            save_strategy="epoch",
             logging_steps=len(self.train_dataset),
             load_best_model_at_end=True,
             metric_for_best_model="f1",
@@ -176,7 +178,7 @@ class Filter:
             )
             for batch in loader:
                 labels = batch.pop("labels")
-
+                self.model.to(self.device)
                 input_ids = batch["input_ids"].to(self.device)
                 attention_mask = batch["attention_mask"].to(self.device)
                 preds = self.model(

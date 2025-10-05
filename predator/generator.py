@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-import texthero as th
+import re
 from transformers import (
     AutoTokenizer,
     AutoConfig,
@@ -13,6 +13,9 @@ from transformers import (
 )
 from .utils import LineByLineTextDataset, BlockTextDataset
 
+def normalize_whitespace(txtseries:pd.Series):
+  for txt in txtseries:
+    yield re.sub(r'\s+', ' ', txt)
 
 class Generator:
     def __init__(
@@ -32,12 +35,12 @@ class Generator:
         print("avg_length", self.avg_length, "std_length", self.std_length)
 
         self.config = AutoConfig.from_pretrained(model_name_or_path)
-        self.config.pad_token_id = self.tokenizer.pad_token_id
-        self.config.max_length = min(
-            self.tokenizer.max_model_input_sizes["gpt2"],
-            # (self.avg_length + 3 * self.std_length),
-            float("inf"),
-        )
+        # self.config.pad_token_id = self.tokenizer.pad_token_id
+        self.config.max_length = (self.avg_length + 3 * self.std_length) # min(
+        #     self.tokenizer.model_max_length,
+        #     # (self.avg_length + 3 * self.std_length),
+        #     float("inf"),
+        # )
 
         max_length = self.config.max_length
 
@@ -47,6 +50,7 @@ class Generator:
             model_name_or_path, config=self.config
         ).to(self.device)
         self.model.resize_token_embeddings(len(self.tokenizer))
+        self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
 
         df_train = pd.DataFrame({"text": texts, "label": labels})
         max_count_label = df_train["label"].value_counts().max()
@@ -71,7 +75,8 @@ class Generator:
             save_total_limit=1,
             learning_rate=lr,
             evaluation_strategy="epoch",
-            logging_steps=float("inf"),
+            save_strategy="epoch",
+            # logging_steps=float("inf"),
             prediction_loss_only=False,
         )
 
@@ -105,19 +110,25 @@ class Generator:
             if self.avg_length > self.config.max_length
             else self.config.max_length - self.avg_length
         )
-        input_ids = self.tokenizer.encode(
+        input = self.tokenizer(
             input_text,
             max_length=max_length_input,
             truncation=True,
             return_tensors="pt",
-        ).to(self.device)
+        )
+        input_ids = input["input_ids"].to(self.device)
+        attention_mask = input["attention_mask"].to(self.device)
         min_length = input_ids.shape[1] + 6
         max_length_output = min(
             input_ids.shape[1] + (self.avg_length), self.config.max_length
         )
-
+        # Sanity check
+        self.model.to(self.device)
+        input_ids.to(self.device)
+        attention_mask.to(self.device)
         output = self.model.generate(
             input_ids=input_ids,
+            attention_mask=attention_mask,
             min_length=min_length,
             max_length=max_length_output,
             do_sample=True,
@@ -132,7 +143,7 @@ class Generator:
         )
         return [
             txt
-            for txt in th.remove_whitespace(pd.Series(results)).tolist()
+            for txt in normalize_whitespace(pd.Series(results))
             if len(txt) > 3
         ]
 
