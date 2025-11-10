@@ -1,4 +1,5 @@
 import os
+import time
 import collections
 import pandas as pd
 from tqdm.auto import tqdm
@@ -9,18 +10,17 @@ from .filter import Filter
 class Predator:
     def __init__(
         self,
-        df_train,
-        df_val,
-        device,
-        num_majority_classes=0,
-        path=None,
+        df_train:pd.DataFrame,
+        df_val:pd.DataFrame,
+        device:str,
+        num_majority_classes:int=0,
+        path:str=None,
         generator_kwargs={},
         filter_kwargs={},
     ):
         self.df_train = df_train.copy()
         self.df_val = df_val
         self.num_majority_classes = num_majority_classes
-
         if num_majority_classes > 0:
             df_train_lm = self.df_train[
                 self.df_train["label"].isin(
@@ -90,9 +90,11 @@ class Predator:
         max_threshold=0.8127,
         generator_args={},
         max_iterations=float("inf"),
+        iterate_until_seconds=0
     ):
         counter = collections.Counter(self.df_train["label"]).most_common()
         majority_class = counter[0][0]
+
         target_size = int(
             len(self.df_train[self.df_train["label"] == majority_class]) * augment_ratio
         )
@@ -114,8 +116,13 @@ class Predator:
         }
 
         i = 0
+        end_time = start_time = time.time()
         with tqdm(total=samples_to_create, desc="Augmentation") as pbar:
-            while minority_size < target_size and i < max_iterations:
+            while minority_size < samples_to_create:
+                # If time has exceeded, start max_iteration limit
+                if (end_time - start_time) > iterate_until_seconds and i >= max_iterations: 
+                    break
+                # else: print(f"{(end_time - start_time)}>{iterate_until_seconds}")
                 inputs = "".join(
                     [
                         f" {t} {self.generator.tokenizer.eos_token} "
@@ -124,7 +131,6 @@ class Predator:
                         ].sample(num_inputs)["text"]
                     ]
                 )
-
                 generated = self.generator.generate(inputs, **generator_args)
                 selected = self.filter.select(generated)
                 selected = [
@@ -132,14 +138,12 @@ class Predator:
                     for (txt, label) in selected
                     if txt not in self.df_train["text"].tolist()
                 ]
-
                 if augment_ratio == 1.0:
                     selected = [
                         [txt, label]
                         for (txt, label) in selected
                         if label != majority_class
                     ]
-
                 prev_train_size = sum(
                     [len(_samples) for (_, _samples) in generated_samples.items()]
                 )
@@ -160,12 +164,14 @@ class Predator:
                     sum([len(_samples) for (_, _samples) in generated_samples.items()])
                     - prev_train_size
                 )
+                end_time = time.time()
 
             generated_samples_list = []
             for (_class, _generated_samples) in generated_samples.items():
                 for _generated_sample in _generated_samples:
                     generated_samples_list.append([_generated_sample, _class])
-
+        # print("self.df_train:", len(self.df_train))
+        # print("generated_samples_list", len(generated_samples_list))
         self.df_train = pd.concat(
             [
                 self.df_train[~self.df_train["label"].isin(classes_to_generate)],
@@ -177,9 +183,17 @@ class Predator:
                 ),
             ]
         )
-
         self.df_train["label"] = self.df_train["label"].astype(int)
-        return self.df_train
+        """
+        WARNING: The original code would return only the generated samples for the minority class,
+        this has been altered to return only the generated samples 
+        """
+        return pd.DataFrame(
+            {
+                "text": [s[0] for s in generated_samples_list],
+                "label": [s[1] for s in generated_samples_list],
+            }
+        )
 
     def save(self, path):
         self.generator.save(path)

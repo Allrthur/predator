@@ -11,7 +11,6 @@ setup(
         "torch",
         "transformers",
         "datasets",
-        "texthero",
-        "sklearn",
+        "scikit-learn",
     ],
 )

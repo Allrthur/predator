@@ -68,16 +68,17 @@ class Generator:
         )
         training_args = TrainingArguments(
             output_dir="./output-lm",
-            no_cuda=(self.device != torch.device("cuda")),
+            use_cpu=(self.device != torch.device("cuda")),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             # save_steps=10,
             save_total_limit=1,
             learning_rate=lr,
-            evaluation_strategy="epoch",
+            eval_strategy="epoch",
             save_strategy="epoch",
             # logging_steps=float("inf"),
             prediction_loss_only=False,
+            report_to="none",
         )
 
         self.trainer = Trainer(
@@ -116,16 +117,15 @@ class Generator:
             truncation=True,
             return_tensors="pt",
         )
+        # Sanity check
+        self.model.to(self.device)
         input_ids = input["input_ids"].to(self.device)
         attention_mask = input["attention_mask"].to(self.device)
+        # min and max length calculation
         min_length = input_ids.shape[1] + 6
         max_length_output = min(
             input_ids.shape[1] + (self.avg_length), self.config.max_length
         )
-        # Sanity check
-        self.model.to(self.device)
-        input_ids.to(self.device)
-        attention_mask.to(self.device)
         output = self.model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,

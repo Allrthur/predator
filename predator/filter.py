@@ -77,10 +77,10 @@ class Filter:
     def train(self, epochs=3, batch_size=32, lr=3e-5):
         training_args = TrainingArguments(
             output_dir="./output-cls",
-            no_cuda=(self.device != torch.device("cuda")),
+            use_cpu=(self.device != torch.device("cuda")),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
-            evaluation_strategy="epoch",
+            eval_strategy="epoch",
             save_strategy="epoch",
             logging_steps=len(self.train_dataset),
             load_best_model_at_end=True,
@@ -89,6 +89,7 @@ class Filter:
             gradient_accumulation_steps=1,
             warmup_steps=0,
             fp16=(self.device == torch.device("cuda")),
+            report_to="none"
         )
 
         self.trainer = _FilterTrainer(
@@ -128,6 +129,7 @@ class Filter:
 
             input_ids = tokenizer_output["input_ids"].to(self.device)
             attention_mask = tokenizer_output["attention_mask"].to(self.device)
+            self.model = self.model.to(self.device)
             preds = self.model(
                 input_ids=input_ids, attention_mask=attention_mask, return_dict=True
             ).logits
@@ -142,7 +144,6 @@ class Filter:
                 text for (text, mask) in zip(texts, threshold_mask) if mask.item()
             ]
             filtered_labels = max_index[threshold_mask].tolist()
-
             return [
                 [text, int(label)]
                 for (text, label) in zip(filtered_texts, filtered_labels)
@@ -169,27 +170,28 @@ class Filter:
         }
 
     def _compute_thresholds(self):
-        confidences = []
-        with torch.no_grad():
-            loader = data.DataLoader(
-                self.val_dataset,
-                batch_size=64,
-                collate_fn=DataCollatorWithPadding(self.tokenizer),
-            )
-            for batch in loader:
-                labels = batch.pop("labels")
-                self.model.to(self.device)
-                input_ids = batch["input_ids"].to(self.device)
-                attention_mask = batch["attention_mask"].to(self.device)
-                preds = self.model(
-                    input_ids=input_ids, attention_mask=attention_mask, return_dict=True
-                ).logits
-                output = F.softmax(preds, dim=1).cpu()
-                max_value, max_index = torch.max(output, dim=1)
-                confidences += max_value[max_index == labels].tolist()
+        # confidences = []
+        # with torch.no_grad():
+        #     loader = data.DataLoader(
+        #         self.val_dataset,
+        #         batch_size=64,
+        #         collate_fn=DataCollatorWithPadding(self.tokenizer),
+        #     )
+        #     for batch in loader:
+        #         labels = batch.pop("labels")
+        #         self.model.to(self.device)
+        #         input_ids = batch["input_ids"].to(self.device)
+        #         attention_mask = batch["attention_mask"].to(self.device)
+        #         preds = self.model(
+        #             input_ids=input_ids, attention_mask=attention_mask, return_dict=True
+        #         ).logits
+        #         output = F.softmax(preds, dim=1).cpu()
+        #         max_value, max_index = torch.max(output, dim=1)
+        #         confidences += max_value[max_index == labels].tolist()
 
-        self.threshold_min = 0.7  # torch.tensor(confidences).mean().item()
-        self.threshold_max = 1.0  # torch.tensor(confidences).max().item()
+        self.threshold_min = 0.7 # torch.tensor(confidences).mean().item()
+        self.threshold_max = 1.0 # torch.tensor(confidences).max().item()
+        # print(self.threshold_max, self.threshold_min)
 
 
 class _FilterTrainer(Trainer):

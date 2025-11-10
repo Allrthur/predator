@@ -4,7 +4,7 @@
 
 > **PRE-trained Data AugmenTOR**
 
-Code release for [Pre-trained Data Augmentation for Text Classification](https://link.springer.com/chapter/10.1007/978-3-030-61377-8_38). **PREDATOR** is a data augmentation technique based on pre-trained language models designed for text classification tasks on either balanced and imbalanced datasets.
+This is a for from the code release for [Pre-trained Data Augmentation for Text Classification](https://link.springer.com/chapter/10.1007/978-3-030-61377-8_38). Adapted for use in [Here] (link)
 
 
 ## Usage
@@ -23,6 +23,7 @@ predator = Predator(df_train, df_valid, device=device)
 predator.train()
 
 df_aug = predator.augment(augment_ratio=3.0) # => augmented dataset
+df_train = pd.concat([df_train,df_aug]) # concatenate generated samples with dataset
 ```
 
 ## Installation
