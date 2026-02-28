@@ -112,7 +112,7 @@ class Filter:
             self._compute_thresholds()
 
         with torch.no_grad():
-            tokenizer_output = self.tokenizer.batch_encode_plus(
+            tokenizer_output = self.tokenizer(
                 texts,
                 return_tensors="pt",
                 padding="longest",
