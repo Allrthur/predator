@@ -131,7 +131,7 @@ class Predator:
                     ]
                 )
                 generated = self.generator.generate(inputs, **generator_args)
-                print("GENERATED SAMPLES:", generated)
+                # print("GENERATED SAMPLES:", generated)
                 selected = self.filter.select(generated)
                 selected = [
                     [txt, label]
