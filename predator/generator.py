@@ -22,7 +22,7 @@ class Generator:
     def __init__(
         self, texts, labels, val_texts, device="cpu", model_name_or_path="distilgpt2", dtype=torch.float32
     ):
-        self.device = torch.device(device)
+        # self.model.device = torch.device(device)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -48,9 +48,9 @@ class Generator:
         print("max_length", max_length, self.config.max_length)
 
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path, config=self.config, torch_dtype=dtype,
+            model_name_or_path, config=self.config, torch_dtype=dtype,device_map=device,
             low_cpu_mem_usage=True, offload_folder="offload", offload_state_dict=False
-        ).to(self.device)
+        )
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
         df_train = pd.DataFrame({"text": texts, "label": labels})
@@ -68,7 +68,7 @@ class Generator:
         )
         training_args = TrainingArguments(
             output_dir="./output-lm",
-            use_cpu=(self.device != torch.device("cuda")),
+            use_cpu=(self.model.device != torch.device("cuda")),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             # save_steps=10,
@@ -117,10 +117,8 @@ class Generator:
             truncation=True,
             return_tensors="pt",
         )
-        # Sanity check
-        self.model.to(self.device)
-        input_ids = input["input_ids"].to(self.device)
-        attention_mask = input["attention_mask"].to(self.device)
+        input_ids = input["input_ids"].to(self.model.device)
+        attention_mask = input["attention_mask"].to(self.model.device)
         # min and max length calculation
         min_length = input_ids.shape[1] + 6
         max_length_output = min(

@@ -28,14 +28,14 @@ class Filter:
         model_name_or_path="distilbert-base-uncased",
     ):
         num_labels = len(set(train_labels))
-        self.device = torch.device(device)
+        # self.model.device = torch.device(device)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.config = AutoConfig.from_pretrained(
             model_name_or_path, num_labels=num_labels
         )
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name_or_path, config=self.config
-        ).to(self.device)
+            model_name_or_path, config=self.config, device_map=device
+        )
 
         class_counts = list(collections.Counter(train_labels).values())
         total_samples = sum(class_counts)
@@ -72,7 +72,7 @@ class Filter:
     def train(self, epochs=3, batch_size=32, lr=3e-5):
         training_args = TrainingArguments(
             output_dir="./output-cls",
-            use_cpu=(self.device != torch.device("cuda")),
+            use_cpu=(self.model.device != torch.device("cuda")),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             eval_strategy="epoch",
@@ -83,7 +83,7 @@ class Filter:
             greater_is_better=True,
             gradient_accumulation_steps=1,
             warmup_steps=0,
-            fp16=(self.device == torch.device("cuda")),
+            fp16=(self.model.device == torch.device("cuda")),
             report_to="none"
         )
 
@@ -122,9 +122,9 @@ class Filter:
                 max_length=self.tokenizer.model_max_length,
             )
 
-            input_ids = tokenizer_output["input_ids"].to(self.device)
-            attention_mask = tokenizer_output["attention_mask"].to(self.device)
-            self.model = self.model.to(self.device)
+            input_ids = tokenizer_output["input_ids"].to(self.model.device)
+            attention_mask = tokenizer_output["attention_mask"].to(self.model.device)
+            self.model = self.model.to(self.model.device)
             preds = self.model(
                 input_ids=input_ids, attention_mask=attention_mask, return_dict=True
             ).logits
@@ -174,9 +174,9 @@ class Filter:
         #     )
         #     for batch in loader:
         #         labels = batch.pop("labels")
-        #         self.model.to(self.device)
-        #         input_ids = batch["input_ids"].to(self.device)
-        #         attention_mask = batch["attention_mask"].to(self.device)
+        #         self.model.to(self.model.device)
+        #         input_ids = batch["input_ids"].to(self.model.device)
+        #         attention_mask = batch["attention_mask"].to(self.model.device)
         #         preds = self.model(
         #             input_ids=input_ids, attention_mask=attention_mask, return_dict=True
         #         ).logits

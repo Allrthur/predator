@@ -44,7 +44,7 @@ class Predator:
             texts=df_train_lm["text"].tolist(),
             labels=df_train_lm["label"].tolist(),
             val_texts=df_val_lm["text"].tolist(),
-            device=device,
+            # device=device,
             **generator_kwargs,
         )
         self.filter = Filter(
@@ -52,7 +52,7 @@ class Predator:
             train_labels=df_train["label"].tolist(),
             val_texts=df_val["text"].tolist(),
             val_labels=df_val["label"].tolist(),
-            device=device,
+            # device=device,
             **filter_kwargs,
         )
 
@@ -114,7 +114,6 @@ class Predator:
             c: self.df_train.query(f"label == '{c}'")["text"].tolist()
             for c in classes_to_generate
         }
-
         i = 0
         end_time = start_time = time.time()
         with tqdm(total=samples_to_create, desc="Augmentation") as pbar:
@@ -132,6 +131,7 @@ class Predator:
                     ]
                 )
                 generated = self.generator.generate(inputs, **generator_args)
+                print("GENERATED SAMPLES:", generated)
                 selected = self.filter.select(generated)
                 selected = [
                     [txt, label]
