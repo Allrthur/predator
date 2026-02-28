@@ -18,18 +18,22 @@ class LineByLineTextDataset(data.Dataset):
 
 class BlockTextDataset(data.Dataset):
     def __init__(self, tokenizer, examples, block_size=64):
+        # 1. Join all text with EOS token
         text = f" {tokenizer.eos_token} ".join(examples)
-        tokenized_text = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(text))
+        
+        # 2. Encode everything at once without special tokens first
+        # We use add_special_tokens=False because we've manually added EOS above
+        tokenized_text = tokenizer.encode(text, add_special_tokens=False)
+        
         self.examples = []
-
-        for i in range(
-            0, len(tokenized_text) - block_size + 1, block_size
-        ):  # Truncate in block of block_size
-            self.examples.append(
-                tokenizer.build_inputs_with_special_tokens(
-                    tokenized_text[i : i + block_size]
-                )
-            )
+        
+        # 3. Create blocks
+        # Instead of build_inputs_with_special_tokens, we slice the already 
+        # tokenized IDs. If you need specific model tokens (like CLS), 
+        # it's better to add them here or use a DataCollator later.
+        for i in range(0, len(tokenized_text) - block_size + 1, block_size):
+            block = tokenized_text[i : i + block_size]
+            self.examples.append(block)
 
     def __len__(self):
         return len(self.examples)

@@ -33,11 +33,6 @@ class Filter:
         self.config = AutoConfig.from_pretrained(
             model_name_or_path, num_labels=num_labels
         )
-        # self.config.max_length = self.tokenizer.max_model_input_sizes[
-        #     "bert-base-cased"
-        #     if "bert-base-cased" in self.tokenizer.max_model_input_sizes
-        #     else "distilbert-base-uncased"
-        # ]
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name_or_path, config=self.config
         ).to(self.device)
@@ -56,7 +51,7 @@ class Filter:
         train_data = self.tokenizer(
             train_texts,
             padding="longest",
-            max_length=self.config.max_length,
+            max_length=self.tokenizer.model_max_length,
             truncation=True,
         )
         train_data.update({"label": train_labels})
@@ -65,7 +60,7 @@ class Filter:
         val_data = self.tokenizer(
             val_texts,
             padding="longest",
-            max_length=self.config.max_length,
+            max_length=self.tokenizer.model_max_length,
             truncation=True,
         )
         val_data.update({"label": val_labels})
@@ -124,7 +119,7 @@ class Filter:
                 truncation=True,
                 add_special_tokens=True,
                 return_attention_mask=True,
-                max_length=self.config.max_length,
+                max_length=self.tokenizer.model_max_length,
             )
 
             input_ids = tokenizer_output["input_ids"].to(self.device)
