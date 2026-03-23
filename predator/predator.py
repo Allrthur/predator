@@ -55,6 +55,9 @@ class Predator:
             # device=device,
             **filter_kwargs,
         )
+        # print("== Inside Predator __init__ ==")
+        # print("Generator device:", self.generator.model.device)
+        # print("Filter device:", self.filter.model.device)
 
     def train(
         self,
@@ -65,6 +68,10 @@ class Predator:
         filter_batch_size=32,
         filter_lr=3e-5,
     ):
+        # print("== Inside Predator train ==")
+        # print("Generator device:", self.generator.model.device)
+        # print("Filter device:", self.filter.model.device)
+        
         self.generator.train(
             epochs=generator_epochs, batch_size=generator_batch_size, lr=generator_lr
         )

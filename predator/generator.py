@@ -20,7 +20,13 @@ def normalize_whitespace(txtseries:pd.Series):
 
 class Generator:
     def __init__(
-        self, texts, labels, val_texts, device="cpu", model_name_or_path="distilgpt2", dtype=torch.float32
+        self, 
+        texts, 
+        labels, 
+        val_texts,
+        device="cpu", 
+        model_name_or_path="distilgpt2", 
+        dtype=torch.float32
     ):
         # self.model.device = torch.device(device)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
@@ -49,7 +55,7 @@ class Generator:
 
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name_or_path, config=self.config, torch_dtype=dtype,device_map=device,
-            low_cpu_mem_usage=True, offload_folder="offload", offload_state_dict=False
+            # low_cpu_mem_usage=True, offload_folder="offload", offload_state_dict=False
         )
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
@@ -68,7 +74,7 @@ class Generator:
         )
         training_args = TrainingArguments(
             output_dir="./output-lm",
-            use_cpu=(self.model.device != torch.device("cuda")),
+            use_cpu=(self.model.device == "cpu"),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             # save_steps=10,
@@ -81,6 +87,7 @@ class Generator:
             report_to="none",
         )
 
+        
         self.trainer = Trainer(
             model=self.model,
             args=training_args,
@@ -88,6 +95,8 @@ class Generator:
             train_dataset=self.train_dataset,
             eval_dataset=self.val_dataset,
         )
+        # print("== Inside Generator train ==")
+        # print("Filter device:", self.model.device)
         self.trainer.train()
         return self.trainer
 

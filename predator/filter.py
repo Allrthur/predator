@@ -72,7 +72,7 @@ class Filter:
     def train(self, epochs=3, batch_size=32, lr=3e-5):
         training_args = TrainingArguments(
             output_dir="./output-cls",
-            use_cpu=(self.model.device != torch.device("cuda")),
+            use_cpu=(self.model.device == "cpu"),
             num_train_epochs=epochs,
             per_device_train_batch_size=batch_size,
             eval_strategy="epoch",
@@ -95,6 +95,8 @@ class Filter:
             eval_dataset=self.val_dataset,
             compute_metrics=self._compute_metrics_fn,
         )
+        # print("== Inside Filter train ==")
+        # print("Filter device:", self.model.device)
         self.trainer.train()
         return self.trainer
 
@@ -124,7 +126,7 @@ class Filter:
 
             input_ids = tokenizer_output["input_ids"].to(self.model.device)
             attention_mask = tokenizer_output["attention_mask"].to(self.model.device)
-            self.model = self.model.to(self.model.device)
+            # self.model = self.model.to(self.model.device)
             preds = self.model(
                 input_ids=input_ids, attention_mask=attention_mask, return_dict=True
             ).logits
