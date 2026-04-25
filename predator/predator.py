@@ -99,6 +99,9 @@ class Predator:
         max_iterations=float("inf"),
         iterate_until_seconds=0
     ):
+        print("Generator is in: ", self.generator.model.device)
+        print("Filter is in: ", self.filter.model.device)
+        
         counter = collections.Counter(self.df_train["label"]).most_common()
         majority_class = counter[0][0]
 

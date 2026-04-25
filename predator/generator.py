@@ -53,10 +53,23 @@ class Generator:
 
         print("max_length", max_length, self.config.max_length)
 
+        # 1. Define the keys that are causing the fuss
+        GEN_KEYS = ["max_length", "do_sample", "top_p", "top_k", "temperature", "repetition_penalty"]
+        # 2. Extract these values into a separate dictionary
+        gen_kwargs = {k: getattr(self.config, k) for k in GEN_KEYS if hasattr(self.config, k)}
+        # 3. Delete them from the main config so the loader doesn't complain
+        for k in GEN_KEYS:
+            if hasattr(self.config, k):
+                delattr(self.config, k)
+        # 4. Load the model with the "clean" config
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path, config=self.config, torch_dtype=dtype,device_map=device,
-            # low_cpu_mem_usage=True, offload_folder="offload", offload_state_dict=False
+            model_name_or_path, 
+            config=self.config, 
+            torch_dtype=dtype, 
+            device_map=device
         )
+        # 5. Manually inject the generation settings back into the correct sub-object
+        self.model.generation_config = GenerationConfig(**gen_kwargs)
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.generation_config.pad_token_id = self.tokenizer.eos_token_id
         df_train = pd.DataFrame({"text": texts, "label": labels})
@@ -116,9 +129,9 @@ class Generator:
         num_return_sequences=4,
     ):
         max_length_input = (
-            self.config.max_length
-            if self.avg_length > self.config.max_length
-            else self.config.max_length - self.avg_length
+            self.model.generation_config.max_length
+            if self.avg_length > self.model.generation_config.max_length
+            else self.model.generation_config.max_length - self.avg_length
         )
         input = self.tokenizer(
             input_text,
@@ -131,7 +144,7 @@ class Generator:
         # min and max length calculation
         min_length = input_ids.shape[1] + 6
         max_length_output = min(
-            input_ids.shape[1] + (self.avg_length), self.config.max_length
+            input_ids.shape[1] + (self.avg_length), self.model.generation_config.max_length
         )
         generation_config = GenerationConfig(
             min_length=min_length,
