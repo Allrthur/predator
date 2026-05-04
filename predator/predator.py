@@ -17,6 +17,7 @@ class Predator:
         path:str=None,
         generator_kwargs={},
         filter_kwargs={},
+        disable_filter:bool=False
     ):
         self.df_train = df_train.copy()
         self.df_val = df_val
@@ -55,6 +56,7 @@ class Predator:
             # device=device,
             **filter_kwargs,
         )
+        self.disable_filter=disable_filter
         # print("== Inside Predator __init__ ==")
         # print("Generator device:", self.generator.model.device)
         # print("Filter device:", self.filter.model.device)
@@ -75,9 +77,10 @@ class Predator:
         self.generator.train(
             epochs=generator_epochs, batch_size=generator_batch_size, lr=generator_lr
         )
-        self.filter.train(
-            epochs=filter_epochs, batch_size=filter_batch_size, lr=filter_lr
-        )
+        if not self.disable_filter:
+            self.filter.train(
+                epochs=filter_epochs, batch_size=filter_batch_size, lr=filter_lr
+            )
 
     def evaluate(self):
         eval_filter = self.filter.evaluate()
@@ -141,13 +144,19 @@ class Predator:
                     ]
                 )
                 generated = self.generator.generate(inputs, **generator_args)
-                # print("GENERATED SAMPLES:", generated)
-                selected = self.filter.select(generated)
+                # print(f"GENERATED {len(generated)} SAMPLES")
+                if self.disable_filter:
+                    selected = [[txt, minority_class] for txt in generated]
+                else:
+                    selected = self.filter.select(generated)
+                # print(f"SELECTED {len(selected)} SAMPLES")
                 selected = [
                     [txt, label]
                     for (txt, label) in selected
                     if txt not in self.df_train["text"].tolist()
                 ]
+                # print(f"SELECTED SAMPLES HAVE THESE CLASSES: {collections.Counter([i for _,i in selected]).most_common()}")
+
                 if augment_ratio == 1.0:
                     selected = [
                         [txt, label]
